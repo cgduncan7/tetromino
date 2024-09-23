@@ -18,9 +18,9 @@ fn main() {
         make_rectangle_piece(),
     ];
 
-    let puzzle = Puzzle::new(8, 8, pieces);
+    let puzzle = Puzzle::new(8, 5, pieces);
 
-    for piece in puzzle.available_pieces {
+    for (_, piece) in puzzle.pieces {
         let occupied_spaces = piece.get_potentially_occupied_spaces(Location { x: 0, y: 0 });
 
         for occupied_space in occupied_spaces {

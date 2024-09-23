@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display, ops::Add};
+use std::{collections::HashMap, fmt::Display, hash::Hash, ops::Add};
 
 /**
  * (0,0) - top-left
@@ -7,22 +7,24 @@ use std::{collections::HashMap, fmt::Display, ops::Add};
 pub struct Puzzle {
     pub width: u8,
     pub height: u8,
-    pub available_pieces: Vec<Piece>,
-    pub pieces: HashMap<Placement, Piece>,
+    pub pieces: HashMap<Option<Placement>, Piece>,
 }
 
 impl Puzzle {
     pub fn new(width: u8, height: u8, available_pieces: Vec<Piece>) -> Self {
+        let mut pieces_map: HashMap<Option<Placement>, Piece> = HashMap::new();
+        for available_piece in available_pieces {
+            pieces_map.insert(None, available_piece);
+        }
         Self {
             width,
             height,
-            available_pieces,
-            pieces: HashMap::new(),
+            pieces: pieces_map,
         }
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Orientation {
     Up(bool),    // 0deg rotation + horizontal flip flag
     Right(bool), // 90deg rotation + horizontal flip flag
@@ -50,7 +52,7 @@ impl Display for Orientation {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Location {
     pub x: i8,
     pub y: i8,
@@ -109,7 +111,7 @@ impl Display for Location {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Placement {
     pub location: Location,
     pub orientation: Orientation,
