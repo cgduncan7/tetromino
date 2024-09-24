@@ -25,5 +25,7 @@ Rules:
 Requires [rust](https://www.rust-lang.org/tools/install).
 
 ```
-cargo run .
+cargo run . [--debug]
+
+-d/--debug: turns on logging and a small delay for visual debugging
 ```
