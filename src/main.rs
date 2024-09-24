@@ -2,6 +2,7 @@ mod backtracking;
 mod puzzle;
 use core::time;
 use std::{
+    env,
     fs::File,
     io::{BufWriter, Write},
 };
@@ -13,6 +14,8 @@ use puzzle::{
 };
 
 fn main() {
+    let debug_mode = env::args().any(|arg| arg.eq("-d") || arg.eq("--debug"));
+
     let pieces: Vec<Piece> = vec![
         make_l_shaped_piece(),
         make_l_shaped_piece(),
@@ -30,8 +33,12 @@ fn main() {
 
     let mut solver = Solver::new(
         SolverOpts {
-            verbose: true,
-            delay: Some(time::Duration::from_millis(100)),
+            verbose: debug_mode,
+            delay: if debug_mode {
+                Some(time::Duration::from_millis(100))
+            } else {
+                None
+            },
         },
         puzzle,
     );
