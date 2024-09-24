@@ -32,7 +32,7 @@ impl Puzzle {
         }
     }
 
-    fn valid_piece_placement(&self, origin: usize, placement: Placement, piece: &Piece) -> bool {
+    fn valid_piece_placement(&self, origin: Location, placement: Placement, piece: &Piece) -> bool {
         let locations = piece.get_potentially_occupied_locations(origin, placement);
 
         !locations.iter().any(|loc| {
@@ -47,7 +47,7 @@ impl Puzzle {
 
     pub fn place_piece(
         &mut self,
-        origin: usize,
+        origin: Location,
         placement: Placement,
         piece_index: usize,
     ) -> Result<(), ()> {
@@ -98,8 +98,8 @@ impl Backtrackable<Puzzle> for Puzzle {
         let mut candidates: Vec<Puzzle> = Vec::new();
 
         for (idx, unplaced_piece) in unplaced_pieces {
-            for origin in unplaced_piece.origins.iter() {
-                for orientation in unplaced_piece.orientations.iter() {
+            for origin in unplaced_piece.locations.iter() {
+                for orientation in get_all_orientations().iter() {
                     let mut next_candidate = self.clone();
                     let placement = Placement {
                         location: Location::from_index(self.width, empty_space_idx.unwrap()),
@@ -173,6 +173,19 @@ impl Display for Orientation {
             Orientation::Left(flip) => f.write_str(format!("Left {}", get_flip_str(flip)).as_str()),
         }
     }
+}
+
+fn get_all_orientations() -> Vec<Orientation> {
+    vec![
+        Orientation::Up(false),
+        Orientation::Up(true),
+        Orientation::Right(false),
+        Orientation::Right(true),
+        Orientation::Down(false),
+        Orientation::Down(true),
+        Orientation::Left(false),
+        Orientation::Left(true),
+    ]
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -277,24 +290,15 @@ impl Display for Placement {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Piece {
     pub shape: String,
-    pub orientations: Vec<Orientation>,
     pub locations: Vec<Location>,
-    pub origins: Vec<usize>,
-    pub placement: Option<(usize, Placement)>,
+    pub placement: Option<(Location, Placement)>,
 }
 
 impl Piece {
-    fn new(
-        shape: String,
-        orientations: Vec<Orientation>,
-        locations: Vec<Location>,
-        origins: Vec<usize>,
-    ) -> Piece {
+    fn new(shape: String, locations: Vec<Location>) -> Piece {
         Piece {
             shape,
-            orientations,
             locations,
-            origins,
             placement: None,
         }
     }
@@ -302,26 +306,23 @@ impl Piece {
     pub fn get_occupied_locations(&self) -> Vec<Location> {
         match self.placement {
             None => vec![],
-            Some((origin, placement)) => {
-                let origin_location = self.locations.get(origin).unwrap();
-                self.locations
-                    .iter()
-                    .map(|l| *l - *origin_location)
-                    .map(|l| l.orient(placement.orientation) + placement.location)
-                    .collect()
-            }
+            Some((origin, placement)) => self
+                .locations
+                .iter()
+                .map(|l| *l - origin)
+                .map(|l| l.orient(placement.orientation) + placement.location)
+                .collect(),
         }
     }
 
     pub fn get_potentially_occupied_locations(
         &self,
-        origin: usize,
+        origin: Location,
         placement: Placement,
     ) -> Vec<Location> {
-        let origin_location = self.locations.get(origin).unwrap();
         self.locations
             .iter()
-            .map(|l| *l - *origin_location)
+            .map(|l| *l - origin)
             .map(|l| l.orient(placement.orientation) + placement.location)
             .collect()
     }
@@ -337,22 +338,11 @@ pub fn make_l_shaped_piece() -> Piece {
     Piece::new(
         String::from("L"),
         vec![
-            Orientation::Up(false),
-            Orientation::Up(true),
-            Orientation::Right(false),
-            Orientation::Right(true),
-            Orientation::Down(false),
-            Orientation::Down(true),
-            Orientation::Left(false),
-            Orientation::Left(true),
-        ],
-        vec![
             Location { x: 0, y: 0 },
             Location { x: 0, y: 1 },
             Location { x: 0, y: 2 },
             Location { x: 1, y: 2 },
         ],
-        vec![0, 2, 3],
     )
 }
 
@@ -365,18 +355,11 @@ pub fn make_t_shaped_piece() -> Piece {
     Piece::new(
         String::from("T"),
         vec![
-            Orientation::Up(false),
-            Orientation::Up(true),
-            Orientation::Right(false),
-            Orientation::Left(false),
-        ],
-        vec![
             Location { x: 0, y: 0 },
             Location { x: 0, y: 1 },
             Location { x: 1, y: 1 },
             Location { x: 0, y: 2 },
         ],
-        vec![0, 2, 3],
     )
 }
 
@@ -387,14 +370,12 @@ pub fn make_t_shaped_piece() -> Piece {
 pub fn make_square_piece() -> Piece {
     Piece::new(
         String::from("Q"),
-        vec![Orientation::Up(false)],
         vec![
             Location { x: 0, y: 0 },
             Location { x: 1, y: 0 },
             Location { x: 0, y: 1 },
             Location { x: 1, y: 1 },
         ],
-        vec![0, 1, 2, 3],
     )
 }
 
@@ -407,22 +388,11 @@ pub fn make_s_shaped_piece() -> Piece {
     Piece::new(
         String::from("S"),
         vec![
-            Orientation::Up(false),
-            Orientation::Up(true),
-            Orientation::Right(false),
-            Orientation::Right(true),
-            Orientation::Down(false),
-            Orientation::Down(true),
-            Orientation::Left(false),
-            Orientation::Left(true),
-        ],
-        vec![
             Location { x: 0, y: 0 },
             Location { x: 0, y: 1 },
             Location { x: 1, y: 1 },
             Location { x: 1, y: 2 },
         ],
-        vec![0, 1, 2, 3],
     )
 }
 
@@ -435,13 +405,11 @@ pub fn make_s_shaped_piece() -> Piece {
 pub fn make_rectangle_piece() -> Piece {
     Piece::new(
         String::from("I"),
-        vec![Orientation::Up(false), Orientation::Right(false)],
         vec![
             Location { x: 0, y: 0 },
             Location { x: 0, y: 1 },
             Location { x: 0, y: 2 },
             Location { x: 0, y: 3 },
         ],
-        vec![0, 3],
     )
 }

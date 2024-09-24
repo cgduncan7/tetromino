@@ -18,7 +18,7 @@ Rules:
 
 ## Possible solutions
 
-783 (but this code finds 1337 which can't be a coincidence)
+783 (but this code finds 881 which can't be a coincidence)
 
 ## Usage
 
