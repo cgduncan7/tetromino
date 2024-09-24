@@ -1,26 +1,149 @@
-use std::{collections::HashMap, fmt::Display, hash::Hash, ops::Add};
+use std::{
+    fmt::Display,
+    hash::Hash,
+    ops::{Add, Sub},
+};
+
+use crate::backtracking::Backtrackable;
 
 /**
  * (0,0) - top-left
  * (width,height) - bottom-right
  */
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Puzzle {
-    pub width: u8,
     pub height: u8,
-    pub pieces: HashMap<Option<Placement>, Piece>,
+    pub width: u8,
+    pub pieces: Vec<Piece>,
+    pub spaces: Vec<Option<usize>>,
 }
 
 impl Puzzle {
-    pub fn new(width: u8, height: u8, available_pieces: Vec<Piece>) -> Self {
-        let mut pieces_map: HashMap<Option<Placement>, Piece> = HashMap::new();
-        for available_piece in available_pieces {
-            pieces_map.insert(None, available_piece);
+    pub fn new(height: u8, width: u8, pieces: Vec<Piece>) -> Self {
+        let mut spaces = Vec::new();
+        for _ in 0..height * width {
+            spaces.push(None);
         }
         Self {
-            width,
             height,
-            pieces: pieces_map,
+            width,
+            pieces,
+            spaces,
         }
+    }
+
+    fn valid_piece_placement(&self, origin: usize, placement: Placement, piece: &Piece) -> bool {
+        let locations = piece.get_potentially_occupied_locations(origin, placement);
+
+        !locations.iter().any(|loc| {
+            let idx = loc.to_index(self.width);
+            self.spaces.get(idx as usize).unwrap_or(&None).is_some()
+                || loc.x < 0
+                || loc.x >= self.width as i8
+                || loc.y < 0
+                || loc.y >= self.height as i8
+        })
+    }
+
+    pub fn place_piece(
+        &mut self,
+        origin: usize,
+        placement: Placement,
+        piece_index: usize,
+    ) -> Result<(), ()> {
+        let piece = self.pieces.get(piece_index).unwrap();
+        if !self.valid_piece_placement(origin, placement, piece) {
+            return Err(());
+        }
+
+        let piece = self.pieces.get_mut(piece_index).unwrap();
+        piece.placement = Some((origin, placement));
+        piece
+            .get_occupied_locations()
+            .iter()
+            .map(|l| l.to_index(self.width))
+            .for_each(|idx| self.spaces[idx] = Some(piece_index));
+        Ok(())
+    }
+
+    fn get_next_empty_space(&self) -> Option<usize> {
+        for idx in 0..(self.width * self.height) as usize {
+            if self.spaces.get(idx as usize).unwrap().is_none() {
+                return Some(idx);
+            }
+        }
+        None
+    }
+}
+
+impl Backtrackable<Puzzle> for Puzzle {
+    fn get_root_candidate(&self) -> Puzzle {
+        self.clone()
+    }
+
+    fn get_next_candidates(&self) -> Vec<Puzzle> {
+        let unplaced_pieces = self
+            .pieces
+            .iter()
+            .enumerate()
+            .filter(|(_, pp)| pp.placement == None)
+            .collect::<Vec<(usize, &Piece)>>();
+
+        let empty_space_idx = self.get_next_empty_space();
+
+        if empty_space_idx.is_none() {
+            return vec![];
+        }
+
+        let mut candidates: Vec<Puzzle> = Vec::new();
+
+        for (idx, unplaced_piece) in unplaced_pieces {
+            for origin in unplaced_piece.origins.iter() {
+                for orientation in unplaced_piece.orientations.iter() {
+                    let mut next_candidate = self.clone();
+                    let placement = Placement {
+                        location: Location::from_index(self.width, empty_space_idx.unwrap()),
+                        orientation: *orientation,
+                    };
+                    if next_candidate.place_piece(*origin, placement, idx).is_ok() {
+                        candidates.push(next_candidate);
+                    }
+                }
+            }
+        }
+
+        return candidates;
+    }
+
+    fn is_solution(&self) -> bool {
+        self.get_next_empty_space().is_none()
+    }
+
+    fn get_solution_hash(&self) -> String {
+        let mut acc = String::new();
+        self.spaces
+            .iter()
+            .filter_map(|s| s.is_some().then(|| s.unwrap()))
+            .for_each(|cur| acc.push_str(&self.pieces.get(cur).unwrap().shape));
+        acc
+    }
+}
+
+impl Display for Puzzle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut ret = String::new();
+        for y in 0..self.height {
+            for x in 0..self.width {
+                let idx = self.width * y + x;
+                let ch = match self.spaces.get(idx as usize).unwrap() {
+                    None => '-',
+                    Some(c) => char::from_digit(*c as u32, 10).unwrap(),
+                };
+                ret.push(ch);
+            }
+            ret.push('\n');
+        }
+        f.write_str(ret.as_str())
     }
 }
 
@@ -92,6 +215,17 @@ impl Location {
             },
         }
     }
+
+    fn from_index(width: u8, idx: usize) -> Location {
+        Location {
+            x: (idx as u8 % width) as i8,
+            y: (idx as u8 / width) as i8,
+        }
+    }
+
+    fn to_index(&self, width: u8) -> usize {
+        (self.y * width as i8 + self.x) as usize
+    }
 }
 
 impl Add for Location {
@@ -101,6 +235,17 @@ impl Add for Location {
         Location {
             x: self.x + rhs.x,
             y: self.y + rhs.y,
+        }
+    }
+}
+
+impl Sub for Location {
+    type Output = Location;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Location {
+            x: self.x - rhs.x,
+            y: self.y - rhs.y,
         }
     }
 }
@@ -121,7 +266,7 @@ impl Display for Placement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(
             format!(
-                "Location: {}\tOrientation: {})",
+                "Location: {} + Orientation: {}",
                 self.location, self.orientation
             )
             .as_str(),
@@ -129,63 +274,55 @@ impl Display for Placement {
     }
 }
 
-#[derive(Debug)]
-pub struct OccupiedSpace {
-    pub placement: Placement,
-    pub locations: Vec<Location>,
-}
-
-impl Display for OccupiedSpace {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let locations_str = self.locations.iter().fold(String::new(), |acc, location| {
-            acc + "\n\t- " + &location.to_string()
-        });
-        f.write_str(
-            format!(
-                "Placement: {}\nLocations:\n {}",
-                self.placement, locations_str
-            )
-            .as_str(),
-        )
-    }
-}
-
-#[derive(Clone)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Piece {
+    pub shape: String,
     pub orientations: Vec<Orientation>,
     pub locations: Vec<Location>,
+    pub origins: Vec<usize>,
+    pub placement: Option<(usize, Placement)>,
 }
 
 impl Piece {
-    fn new(orientations: Vec<Orientation>, locations: Vec<Location>) -> Piece {
+    fn new(
+        shape: String,
+        orientations: Vec<Orientation>,
+        locations: Vec<Location>,
+        origins: Vec<usize>,
+    ) -> Piece {
         Piece {
+            shape,
             orientations,
             locations,
+            origins,
+            placement: None,
         }
     }
 
-    pub fn get_potentially_occupied_space(&self, placement: Placement) -> OccupiedSpace {
-        let locations = self
-            .locations
-            .iter()
-            .map(|location| location.orient(placement.orientation) + placement.location)
-            .collect();
-
-        OccupiedSpace {
-            placement,
-            locations,
+    pub fn get_occupied_locations(&self) -> Vec<Location> {
+        match self.placement {
+            None => vec![],
+            Some((origin, placement)) => {
+                let origin_location = self.locations.get(origin).unwrap();
+                self.locations
+                    .iter()
+                    .map(|l| *l - *origin_location)
+                    .map(|l| l.orient(placement.orientation) + placement.location)
+                    .collect()
+            }
         }
     }
 
-    pub fn get_potentially_occupied_spaces(&self, location: Location) -> Vec<OccupiedSpace> {
-        self.orientations
+    pub fn get_potentially_occupied_locations(
+        &self,
+        origin: usize,
+        placement: Placement,
+    ) -> Vec<Location> {
+        let origin_location = self.locations.get(origin).unwrap();
+        self.locations
             .iter()
-            .map(|orientation| {
-                self.get_potentially_occupied_space(Placement {
-                    location,
-                    orientation: *orientation,
-                })
-            })
+            .map(|l| *l - *origin_location)
+            .map(|l| l.orient(placement.orientation) + placement.location)
             .collect()
     }
 }
@@ -198,6 +335,7 @@ impl Piece {
  */
 pub fn make_l_shaped_piece() -> Piece {
     Piece::new(
+        String::from("L"),
         vec![
             Orientation::Up(false),
             Orientation::Up(true),
@@ -214,6 +352,7 @@ pub fn make_l_shaped_piece() -> Piece {
             Location { x: 0, y: 2 },
             Location { x: 1, y: 2 },
         ],
+        vec![0, 2, 3],
     )
 }
 
@@ -224,6 +363,7 @@ pub fn make_l_shaped_piece() -> Piece {
  */
 pub fn make_t_shaped_piece() -> Piece {
     Piece::new(
+        String::from("T"),
         vec![
             Orientation::Up(false),
             Orientation::Up(true),
@@ -236,6 +376,7 @@ pub fn make_t_shaped_piece() -> Piece {
             Location { x: 1, y: 1 },
             Location { x: 0, y: 2 },
         ],
+        vec![0, 2, 3],
     )
 }
 
@@ -245,6 +386,7 @@ pub fn make_t_shaped_piece() -> Piece {
  */
 pub fn make_square_piece() -> Piece {
     Piece::new(
+        String::from("Q"),
         vec![Orientation::Up(false)],
         vec![
             Location { x: 0, y: 0 },
@@ -252,6 +394,7 @@ pub fn make_square_piece() -> Piece {
             Location { x: 0, y: 1 },
             Location { x: 1, y: 1 },
         ],
+        vec![0, 1, 2, 3],
     )
 }
 
@@ -262,6 +405,7 @@ pub fn make_square_piece() -> Piece {
  */
 pub fn make_s_shaped_piece() -> Piece {
     Piece::new(
+        String::from("S"),
         vec![
             Orientation::Up(false),
             Orientation::Up(true),
@@ -278,6 +422,7 @@ pub fn make_s_shaped_piece() -> Piece {
             Location { x: 1, y: 1 },
             Location { x: 1, y: 2 },
         ],
+        vec![0, 1, 2, 3],
     )
 }
 
@@ -289,6 +434,7 @@ pub fn make_s_shaped_piece() -> Piece {
  */
 pub fn make_rectangle_piece() -> Piece {
     Piece::new(
+        String::from("I"),
         vec![Orientation::Up(false), Orientation::Right(false)],
         vec![
             Location { x: 0, y: 0 },
@@ -296,5 +442,6 @@ pub fn make_rectangle_piece() -> Piece {
             Location { x: 0, y: 2 },
             Location { x: 0, y: 3 },
         ],
+        vec![0, 3],
     )
 }

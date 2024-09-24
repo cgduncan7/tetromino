@@ -1,7 +1,15 @@
+mod backtracking;
 mod puzzle;
+use core::time;
+use std::{
+    fs::File,
+    io::{BufWriter, Write},
+};
+
+use backtracking::{Solver, SolverOpts};
 use puzzle::{
     make_l_shaped_piece, make_rectangle_piece, make_s_shaped_piece, make_square_piece,
-    make_t_shaped_piece, Location, Piece, Puzzle,
+    make_t_shaped_piece, Piece, Puzzle,
 };
 
 fn main() {
@@ -20,11 +28,20 @@ fn main() {
 
     let puzzle = Puzzle::new(8, 5, pieces);
 
-    for (_, piece) in puzzle.pieces {
-        let occupied_spaces = piece.get_potentially_occupied_spaces(Location { x: 0, y: 0 });
+    let mut solver = Solver::new(
+        SolverOpts {
+            verbose: true,
+            delay: Some(time::Duration::from_millis(100)),
+        },
+        puzzle,
+    );
+    solver.solve(None);
+    println!("Number of solutions: {}", solver.solutions.len());
 
-        for occupied_space in occupied_spaces {
-            println!("{}", occupied_space);
-        }
+    let f = File::create("output.txt").unwrap();
+    let mut writer = BufWriter::new(f);
+    for (_, puzzle) in solver.solutions {
+        writer.write(puzzle.to_string().as_bytes()).unwrap();
+        writer.write("\n".as_bytes()).unwrap();
     }
 }
