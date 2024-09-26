@@ -1,16 +1,11 @@
 use core::time;
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::Display,
-    hash::Hash,
-    thread::sleep,
-};
+use std::{collections::HashSet, fmt::Display, thread::sleep};
 
-pub trait Backtrackable<T: Backtrackable<T> + Clone + Display + Eq + Hash + PartialEq> {
-    fn get_root_candidate(&self) -> T;
+pub trait Backtrackable<T: Backtrackable<T> + Clone + Display + Eq + PartialEq> {
     fn get_next_candidates(&self) -> Vec<T>;
     fn is_solution(&self) -> bool;
-    fn get_solution_hash(&self) -> String;
+    fn insert_explorations(&self, hash_set: &mut HashSet<String>);
+    fn is_candidate_explored(&self, hash_set: &HashSet<String>) -> bool;
 }
 
 pub struct SolverOpts {
@@ -27,74 +22,71 @@ impl Default for SolverOpts {
     }
 }
 
-pub struct Solver<T: Backtrackable<T> + Clone + Display + Eq + Hash + PartialEq> {
+pub struct Solver<T: Backtrackable<T> + Clone + Display + Eq + PartialEq> {
     opts: SolverOpts,
-    pub root_candidate: T,
     pub explored_candidates: HashSet<String>,
-    pub solutions: HashMap<String, T>,
+    pub solutions: Vec<T>,
 }
 
-impl<T: Backtrackable<T> + Clone + Display + Eq + Hash + PartialEq> Solver<T> {
-    pub fn new(opts: SolverOpts, backtrackable: impl Backtrackable<T>) -> Self {
-        let root_candidate = backtrackable.get_root_candidate();
+impl<T: Backtrackable<T> + Clone + Display + Eq + PartialEq> Solver<T> {
+    pub fn new(opts: SolverOpts) -> Self {
         Solver {
             opts,
-            root_candidate,
             explored_candidates: HashSet::new(),
-            solutions: HashMap::new(),
+            solutions: Vec::new(),
         }
     }
 
-    pub fn solve(&mut self, candidate_opt: Option<&mut T>) {
-        let candidate: &mut T = candidate_opt.unwrap_or(&mut self.root_candidate);
+    pub fn solve(&mut self, candidate: &mut T) {
         if let Some(dur) = self.opts.delay {
             sleep(dur);
         }
 
         if self.opts.verbose {
             print!("\x1B[2J\x1B[1;1H");
+            println!("Current solutions: {}", self.solutions.len());
             println!("\n\nCurrent candidate:\n{}\n", candidate);
         }
 
-        if self
-            .explored_candidates
-            .contains(&candidate.get_solution_hash())
-        {
+        if candidate.is_candidate_explored(&self.explored_candidates) {
             if self.opts.verbose {
                 println!("Has been explored");
             }
             return;
         }
 
-        if candidate.is_solution() {
+        if candidate.is_solution() && !candidate.is_candidate_explored(&self.explored_candidates) {
             // solved-end
             if self.opts.verbose {
                 println!("Solved!");
             }
-            let hash = candidate.get_solution_hash();
-            self.explored_candidates.insert(hash.clone());
-            self.solutions.insert(hash.clone(), candidate.clone());
+            candidate.insert_explorations(&mut self.explored_candidates);
+            self.solutions.push(candidate.to_owned());
             return;
         }
 
-        let next_candidates = candidate.get_next_candidates();
-        let mut unexplored_candidates: Vec<T> = next_candidates
-            .iter()
-            .filter(|c| !self.explored_candidates.contains(&c.get_solution_hash()))
-            .map(|c| c.clone())
-            .collect();
+        let mut next_candidates = candidate.get_next_candidates();
+        let mut unique_candidates = HashSet::new();
+        let mut unexplored_candidates: Vec<&mut T> = Vec::new();
+        next_candidates.iter_mut().for_each(|c| {
+            if !c.is_candidate_explored(&self.explored_candidates)
+                && !c.is_candidate_explored(&unique_candidates)
+            {
+                c.insert_explorations(&mut unique_candidates);
+                unexplored_candidates.push(c);
+            }
+        });
 
         if unexplored_candidates.len() == 0 {
             // dead-end
             if self.opts.verbose {
                 println!("No unexplored candidates left");
             }
-            self.explored_candidates
-                .insert(candidate.get_solution_hash());
         } else {
             for uc in unexplored_candidates.iter_mut() {
-                self.solve(Some(uc));
+                self.solve(uc);
             }
         }
+        candidate.insert_explorations(&mut self.explored_candidates);
     }
 }

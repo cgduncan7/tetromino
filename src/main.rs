@@ -14,7 +14,7 @@ use puzzle::{
 };
 
 fn main() {
-    let debug_mode = env::args().any(|arg| arg.eq("-d") || arg.eq("--debug"));
+    let debug_mode = env::args().any(|arg| arg.starts_with("-d") || arg.starts_with("--debug"));
 
     let pieces: Vec<Piece> = vec![
         make_l_shaped_piece(),
@@ -29,26 +29,23 @@ fn main() {
         make_rectangle_piece(),
     ];
 
-    let puzzle = Puzzle::new(8, 5, pieces);
+    let mut puzzle = Puzzle::new(8, 5, pieces.clone());
 
-    let mut solver = Solver::new(
-        SolverOpts {
-            verbose: debug_mode,
-            delay: if debug_mode {
-                Some(time::Duration::from_millis(100))
-            } else {
-                None
-            },
+    let mut solver = Solver::new(SolverOpts {
+        verbose: debug_mode,
+        delay: if debug_mode {
+            Some(time::Duration::from_millis(50))
+        } else {
+            None
         },
-        puzzle,
-    );
-    solver.solve(None);
+    });
+    solver.solve(&mut puzzle);
     println!("Number of solutions: {}", solver.solutions.len());
 
     let f = File::create("output.txt").unwrap();
     let mut writer = BufWriter::new(f);
-    for (_, puzzle) in solver.solutions {
-        writer.write(puzzle.to_string().as_bytes()).unwrap();
+    for puzzle in solver.solutions {
+        writer.write(format!("{}", puzzle).as_bytes()).unwrap();
         writer.write("\n".as_bytes()).unwrap();
     }
 }
