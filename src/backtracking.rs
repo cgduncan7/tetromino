@@ -44,6 +44,7 @@ impl<T: Backtrackable<T> + Clone + Display + Eq + PartialEq> Solver<T> {
 
         if self.opts.verbose {
             print!("\x1B[2J\x1B[1;1H");
+            println!("Explored candidates: {}", self.explored_candidates.len());
             println!("Current solutions: {}", self.solutions.len());
             println!("\n\nCurrent candidate:\n{}\n", candidate);
         }

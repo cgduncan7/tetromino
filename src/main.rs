@@ -1,10 +1,10 @@
 mod backtracking;
 mod puzzle;
-use core::time;
 use std::{
     env,
     fs::File,
     io::{BufWriter, Write},
+    time,
 };
 
 use backtracking::{Solver, SolverOpts};
@@ -29,12 +29,12 @@ fn main() {
         make_rectangle_piece(),
     ];
 
-    let mut puzzle = Puzzle::new(8, 5, pieces.clone());
+    let mut puzzle = Puzzle::new(5, 8, pieces.clone());
 
     let mut solver = Solver::new(SolverOpts {
         verbose: debug_mode,
         delay: if debug_mode {
-            Some(time::Duration::from_millis(50))
+            Some(time::Duration::from_millis(100))
         } else {
             None
         },

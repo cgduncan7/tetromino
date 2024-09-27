@@ -10,23 +10,56 @@ use crate::backtracking::Backtrackable;
 #[derive(Clone, Debug, Eq, PartialOrd, Ord)]
 pub struct PuzzleHash {
     pub forwards: String,
-    pub backwards: String,
+    pub rotated_180: String,
+    pub mirrored_horizontally: String,
+    pub mirrored_vertically: String,
 }
 
 impl PuzzleHash {
-    pub fn new(forwards: String) -> Self {
-        let backwards = forwards.chars().rev().collect::<String>();
+    pub fn new(height: usize, width: usize, forwards: String) -> Self {
+        let mut rotated_180 = String::new();
+        let mut mirrored_horizontally = String::new();
+        let mut mirrored_vertically = String::new();
+        let chars = forwards.chars().collect::<Vec<char>>();
+        for y in 0..height {
+            for x in 0..width {
+                let rotated_y = height - y - 1;
+                let mirrored_h_y = height - y - 1;
+                let mirrored_v_y = y;
+
+                let rotated_x = width - x - 1;
+                let mirrored_h_x = x;
+                let mirrored_v_x = width - x - 1;
+
+                let rotated_idx = rotated_y * width + rotated_x;
+                let mirrored_h_idx = mirrored_h_y * width + mirrored_h_x;
+                let mirrored_v_idx = mirrored_v_y * width + mirrored_v_x;
+
+                let rotated_char = chars.get(rotated_idx).unwrap();
+                let mirrored_h_char = chars.get(mirrored_h_idx).unwrap();
+                let mirrored_v_char = chars.get(mirrored_v_idx).unwrap();
+
+                rotated_180.push(*rotated_char);
+                mirrored_horizontally.push(*mirrored_h_char);
+                mirrored_vertically.push(*mirrored_v_char);
+            }
+        }
+
         Self {
             forwards,
-            backwards,
+            rotated_180,
+            mirrored_horizontally,
+            mirrored_vertically,
         }
     }
 }
 
 impl PartialEq for PuzzleHash {
     fn eq(&self, other: &Self) -> bool {
-        // to remove symmetric answers (if I rotate the puzzle 180deg)
-        self.forwards == other.forwards || self.backwards == other.forwards
+        self.forwards == other.forwards
+            || self.rotated_180 == other.forwards
+            || self.mirrored_horizontally == other.forwards
+            || self.mirrored_vertically == other.forwards
     }
 }
 
@@ -54,7 +87,11 @@ impl Puzzle {
             width,
             pieces,
             spaces,
-            hash: PuzzleHash::new(String::from("")),
+            hash: PuzzleHash::new(
+                usize::try_from(height).unwrap(),
+                usize::try_from(width).unwrap(),
+                String::from("-".repeat(usize::try_from(height * width).unwrap())),
+            ),
         }
     }
 
@@ -115,7 +152,11 @@ impl Puzzle {
             }
         }
 
-        PuzzleHash::new(acc)
+        PuzzleHash::new(
+            usize::try_from(self.height).unwrap(),
+            usize::try_from(self.width).unwrap(),
+            acc,
+        )
     }
 }
 
@@ -155,16 +196,21 @@ impl Backtrackable<Puzzle> for Puzzle {
     }
 
     fn is_solution(&self) -> bool {
-        self.get_next_empty_space().is_none()
+        self.get_next_empty_space().is_none() && self.pieces.iter().all(|p| p.placement.is_some())
     }
 
     fn insert_explorations(&self, hash_set: &mut HashSet<String>) {
         hash_set.insert(self.hash.forwards.clone());
-        hash_set.insert(self.hash.backwards.clone());
+        hash_set.insert(self.hash.rotated_180.clone());
+        hash_set.insert(self.hash.mirrored_horizontally.clone());
+        hash_set.insert(self.hash.mirrored_vertically.clone());
     }
 
     fn is_candidate_explored(&self, hash_set: &HashSet<String>) -> bool {
-        hash_set.contains(&self.hash.forwards) || hash_set.contains(&self.hash.backwards)
+        hash_set.contains(&self.hash.forwards)
+            || hash_set.contains(&self.hash.rotated_180)
+            || hash_set.contains(&self.hash.mirrored_horizontally)
+            || hash_set.contains(&self.hash.mirrored_vertically)
     }
 }
 
@@ -176,7 +222,7 @@ impl Display for Puzzle {
                 let idx = self.width * y + x;
                 let ch = match self.spaces.get(idx as usize).unwrap() {
                     None => '-',
-                    Some(c) => char::from_digit(*c as u32, 10).unwrap(),
+                    Some(c) => self.pieces.get(*c).unwrap().shape,
                 };
                 ret.push(ch);
             }
