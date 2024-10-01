@@ -7,6 +7,7 @@ use std::{
     time,
 };
 
+use ::time::{format_description, OffsetDateTime};
 use backtracking::{Solver, SolverOpts};
 use puzzle::{
     make_l_shaped_piece, make_rectangle_piece, make_s_shaped_piece, make_square_piece,
@@ -42,7 +43,13 @@ fn main() {
     solver.solve(&mut puzzle);
     println!("Number of solutions: {}", solver.solutions.len());
 
-    let f = File::create("output.txt").unwrap();
+    let odt: OffsetDateTime = time::SystemTime::now().into();
+    let output_filename = format!(
+        "output_{}.txt",
+        odt.format(&format_description::parse("[year][month][day][hour][minute][second]").unwrap())
+            .unwrap()
+    );
+    let f = File::create(output_filename).unwrap();
     let mut writer = BufWriter::new(f);
     for puzzle in solver.solutions {
         writer.write(format!("{}", puzzle).as_bytes()).unwrap();
