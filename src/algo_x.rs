@@ -1,159 +1,139 @@
-#[derive(Clone, Debug, Eq)]
-pub struct MatrixNode {
-    pub column: usize,
-    pub row: usize,
-}
-
-impl MatrixNode {
-    pub fn new(column: usize, row: usize) -> Self {
-        Self { column, row }
-    }
-}
-
-impl PartialEq for MatrixNode {
-    fn eq(&self, other: &Self) -> bool {
-        self.column == other.column && self.row == other.row
-    }
-}
-
-#[derive(Clone, Debug, Eq)]
-pub struct MatrixControlNode {
-    pub column: usize,
-}
-
-impl PartialEq for MatrixControlNode {
-    fn eq(&self, other: &Self) -> bool {
-        self.column == other.column
-    }
-}
+use std::collections::HashMap;
 
 #[derive(Clone)]
-pub struct Matrix {}
+pub struct Matrix {
+    nodes: Vec<(u32, u32)>,
+    removed_cols: Vec<u32>,
+    removed_rows: Vec<u32>,
+    col_length_map: HashMap<u32, u32>,
+    pub solution_rows: Vec<u32>,
+}
 
 impl Matrix {
-    // pub fn add_row_linked_list(&mut self, matrix_nodes: CircularDoublyLinkedList<MatrixNode>) {
-    //     self.rows.push(matrix_nodes.clone());
-    //     for matrix_node in matrix_nodes {
-    //         match self.columns.find(MatrixControlNode {
-    //             column: matrix_node.borrow().contents.column,
-    //             rows: None,
-    //         }) {
-    //             None => {
-    //                 let mut col_rows = CircularDoublyLinkedList::new();
-    //                 col_rows.insert_tail(*matrix_node.borrow().clone().contents);
-    //                 self.columns.insert_tail(MatrixControlNode {
-    //                     column: matrix_node.borrow().contents.column,
-    //                     rows: Some(col_rows.clone()),
-    //                 });
-    //             }
-    //             Some(mcn) => {
-    //                 let mut mcn = mcn.as_ref().borrow_mut();
-    //                 mcn.contents
-    //                     .rows
-    //                     .as_mut()
-    //                     .unwrap()
-    //                     .insert_tail(*matrix_node.borrow().clone().contents);
-    //             }
-    //         }
-    //     }
-    // }
+    pub fn new(nodes: Vec<(u32, u32)>) -> Self {
+        let mut col_length_map: HashMap<u32, u32> = HashMap::new();
+        let mut num_cols: u32 = 0;
+        for (col, _) in &nodes {
+            num_cols = u32::max(*col, num_cols);
+            let col_length = col_length_map.get(col).unwrap_or(&0) + 1;
+            col_length_map.insert(*col, col_length);
+        }
 
-    // pub fn add_row(&mut self, matrix_nodes: Vec<MatrixNode>) {
-    //     let mut row_ll: CircularDoublyLinkedList<MatrixNode> = CircularDoublyLinkedList::new();
+        Self {
+            nodes,
+            removed_cols: vec![],
+            removed_rows: vec![],
+            col_length_map,
+            solution_rows: vec![],
+        }
+    }
 
-    //     for matrix_node in matrix_nodes {
-    //         row_ll.insert_tail(matrix_node.clone());
+    pub fn get_nodes_in_col(&self, col: u32) -> Vec<(u32, u32)> {
+        let mut nodes: Vec<(u32, u32)> = vec![];
+        for (c, r) in &self.nodes {
+            if !self.removed_cols.contains(c) && !self.removed_rows.contains(r) && c == &col {
+                nodes.push((*c, *r));
+            }
+        }
+        nodes
+    }
 
-    //         match self.columns.find(MatrixControlNode {
-    //             column: matrix_node.column,
-    //             rows: None,
-    //         }) {
-    //             None => {
-    //                 let mut col_rows = CircularDoublyLinkedList::new();
-    //                 col_rows.insert_tail(matrix_node.clone());
-    //                 self.columns.insert_tail(MatrixControlNode {
-    //                     column: matrix_node.column,
-    //                     rows: Some(col_rows.clone()),
-    //                 });
-    //             }
-    //             Some(mcn) => {
-    //                 let mut mcn = mcn.as_ref().borrow_mut();
-    //                 mcn.contents.rows.as_mut().unwrap().insert_tail(matrix_node);
-    //             }
-    //         }
-    //     }
+    pub fn remove_col(&mut self, col: u32) {
+        if self.removed_cols.contains(&col) {
+            return;
+        }
+        println!("x Removing col {}", col);
+        self.removed_cols.push(col);
+    }
 
-    //     self.rows.push(row_ll);
-    // }
+    pub fn get_nodes_in_row(&self, row: u32) -> Vec<(u32, u32)> {
+        let mut nodes: Vec<(u32, u32)> = vec![];
+        for (c, r) in &self.nodes {
+            if !self.removed_rows.contains(r) && !self.removed_cols.contains(c) && r == &row {
+                nodes.push((*c, *r));
+            }
+        }
+        nodes
+    }
 
-    // pub fn remove_row_from_column(
-    //     &mut self,
-    //     row: usize,
-    //     control_node: OptionalRef<DoublyLinkedListNode<MatrixControlNode>>,
-    // ) {
-    //     if let Some(control_node) = control_node {}
-    // }
+    pub fn remove_row(&mut self, row: u32) {
+        if self.removed_rows.contains(&row) {
+            return;
+        }
+        println!("x Removing row {}", row);
+        self.removed_rows.push(row);
 
-    // pub fn find_sparsest_column(&self) -> Option<MatrixControlNode> {
-    //     let mut current_candidate_control_node: OptionalRef<
-    //         DoublyLinkedListNode<MatrixControlNode>,
-    //     > = None;
-    //     let mut control_node = self.columns.head.clone();
-    //     for _ in 0..self.columns.size {
-    //         if let Some(inner) = &control_node {
-    //             if let Some(inner_rows) = &inner.borrow().contents.rows {
-    //                 let inner_rows_size = inner_rows.size;
-    //                 match current_candidate_control_node {
-    //                     None => current_candidate_control_node = Some(inner.clone()),
-    //                     Some(ref cccn) => {
-    //                         if cccn.borrow().contents.rows.as_ref().unwrap().size > inner_rows_size
-    //                         {
-    //                             println!("Using {}", inner.borrow().contents.column);
-    //                             current_candidate_control_node = Some(inner.clone());
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //             let ib = inner.clone();
-    //             control_node = Some(ib.borrow().next.as_ref().unwrap().clone());
-    //         }
-    //     }
+        for (c, r) in &self.nodes {
+            if row == *r {
+                let new_col_length = self.col_length_map.get(c).unwrap_or(&1) - 1;
+                self.col_length_map.insert(*c, new_col_length);
+            }
+        }
+    }
 
-    //     match current_candidate_control_node {
-    //         None => None,
-    //         Some(n) => Some(*n.borrow().contents.clone()),
-    //     }
-    // }
+    pub fn get_sparsest_col(&self) -> Option<(u32, u32)> {
+        let mut sparsest: Option<(&u32, &u32)> = None;
+        let mut keys: Vec<&u32> = self.col_length_map.keys().collect::<Vec<&u32>>();
+        keys.sort();
+        for current_col in keys {
+            if self.removed_cols.contains(current_col) {
+                continue;
+            }
+            println!("Checking {}", current_col);
 
-    // pub fn remove_column(&mut self, column: usize) -> Option<MatrixControlNode> {
-    //     if let Some(to_remove) = self.columns.find(MatrixControlNode { column, rows: None }) {
-    //         let next_to_use = to_remove.borrow().next.clone();
-    //         let prev_to_use = to_remove.borrow().prev.clone();
+            let current_len = self.col_length_map.get(current_col).unwrap();
+            println!("-> Length {}", current_len);
+            if sparsest.is_none() {
+                sparsest = Some((current_col, current_len));
+            } else if let Some(s) = sparsest {
+                if s.1 > current_len {
+                    sparsest = Some((current_col, current_len));
+                }
+            }
+        }
 
-    //         if let Some(prev) = &to_remove.borrow().prev {
-    //             prev.borrow_mut().set_next(next_to_use);
-    //         }
+        match sparsest {
+            None => None,
+            Some((c, l)) => Some((*c, *l)),
+        }
+    }
 
-    //         if let Some(next) = &to_remove.borrow().next {
-    //             next.borrow_mut().set_prev(prev_to_use);
-    //         }
-    //     }
-
-    //     None
-    // }
-
-    // pub fn restore_column(
-    //     &mut self,
-    //     control_node: OptionalRef<DoublyLinkedListNode<MatrixControlNode>>,
-    // ) {
-    //     if let Some(cn) = control_node {
-    //         if let Some(prev) = &cn.borrow().prev {
-    //             prev.borrow_mut().set_next(Some(cn.clone()));
-    //         }
-
-    //         if let Some(next) = &cn.borrow().next {
-    //             next.borrow_mut().set_prev(Some(cn.clone()));
-    //         }
-    //     }
-    // }
+    pub fn solve(&mut self) -> bool {
+        println!(
+            "\nSOLVE\nself: {:?}, {:?}, {:?}",
+            self.solution_rows, self.removed_cols, self.removed_rows
+        );
+        let sparsest_col = self.get_sparsest_col();
+        println!("Choosing col {:?}", sparsest_col);
+        match sparsest_col {
+            None => true,
+            Some((sc, sl)) => {
+                if sl == 0 {
+                    println!("Sparsest column is 0, failing");
+                    return false;
+                } else {
+                    let potential_rows = self.get_nodes_in_col(sc);
+                    for (_, row) in potential_rows {
+                        println!("Adding row {} to solution", row);
+                        let mut child_clone = self.clone();
+                        child_clone.solution_rows.push(row);
+                        for (col, _) in child_clone.get_nodes_in_row(row) {
+                            for (_, r) in child_clone.get_nodes_in_col(col) {
+                                child_clone.remove_row(r);
+                            }
+                            child_clone.remove_col(col);
+                        }
+                        child_clone.remove_row(row);
+                        if child_clone.solve() {
+                            self.solution_rows = child_clone.solution_rows;
+                            return true;
+                        } else {
+                            println!("Next candidate");
+                        }
+                    }
+                    false
+                }
+            }
+        }
+    }
 }
